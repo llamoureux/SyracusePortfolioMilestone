@@ -2,10 +2,10 @@
 
 **Name:** Laura L. Lamoureux
 
-SUID: 823691551
+**SUID:** 823691551
 
-Email: llamoure@syr.edu
+**Email:** llamoure@syr.edu
 
-Description:
+**Description:**
 
-Table of Contents:
+##Table of Contents:
