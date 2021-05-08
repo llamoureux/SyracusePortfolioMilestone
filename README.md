@@ -11,7 +11,7 @@
 ## Table of Contents:
 1. Overview
 - Read.md file provides Overview and Table of Contents for the Portfolio Milestone Project
-3. Professional Resume
-4. Portfolio Report
-5. Projects Reflected in Portfolio Report
-6. Portfolio Presentation
+2. Professional Resume
+3. Portfolio Report
+4. Projects Reflected in Portfolio Report
+5. Portfolio Presentation
