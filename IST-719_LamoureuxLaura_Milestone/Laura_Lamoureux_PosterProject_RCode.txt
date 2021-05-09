@@ -1,0 +1,207 @@
+# Laura Lamoureux
+# IST 719 Project
+# 
+
+# Load libraries
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(tidyverse)
+library(plotly)
+library(gridExtra)
+library(scales)
+
+# Read In Data
+fname <- file.choose()
+books <- read.csv(file = paste0(fname)
+                  , header = TRUE
+                  , stringsAsFactors = FALSE)
+
+# Look At The Data
+str(books)
+summary(books)
+colnames(books)
+View(books)
+
+# Change Column Names
+colnames(books)[1] <- 'Book_ID'
+colnames(books)[2] <- 'Title'
+colnames(books)[3] <- 'Authors'
+colnames(books)[4] <- 'Average_Rating'
+colnames(books)[5] <- 'ISBN'
+colnames(books)[6] <- 'ISBN13'
+colnames(books)[7] <- 'Language_Code'
+colnames(books)[8] <- 'Number_Pages'
+colnames(books)[9] <- 'Ratings_Count'
+colnames(books)[10] <- 'Text_Reviews_Count'
+colnames(books)[11] <- 'Publication_Date'
+colnames(books)[12] <- 'Publisher'
+colnames(books)
+
+## Clean the data
+# Convert to numeric
+books$Average_Rating <- as.numeric(books$Average_Rating)
+books$Number_Pages <- as.numeric(books$Number_Pages)
+str(books)
+
+# Remove missing values
+books = na.omit(books)
+str(books)
+
+# Clean Language_Code column
+# Combine all of the "english" codes
+books$Language_Code <- revalue(books$Language_Code, c('en-CA' = 'eng', 'en-GB' = 'eng'
+                                                      , 'en-US' = 'eng'))
+
+booksLanguage = books %>% select(Language_Code) %>% group_by(Language_Code) %>% summarise(count = n()) %>% 
+  arrange(desc(count)) %>% top_n(10)
+
+# Fix author column
+books$Authors <- gsub("(.*?)-.*", "\\1", books$Authors)
+
+booksAuthors = books %>% select(Authors) %>% group_by(Authors) %>% summarise(count = n()) %>% 
+  arrange(desc(count)) %>% top_n(10)
+
+# Plot 1 language - data exploration (LanguagePlot)
+par(mar = c(5, 5, 4, 1), cex.lab = 1.0)
+ggplot(booksLanguage, aes(x = reorder(Language_Code, -count), y = count)) +
+  geom_bar(stat = "identity") + 
+  scale_fill_manual("legend", values = c("eng" = "#63B0B8", "spa" = "#BF98BC", "fre" = "#7DA9CF"
+                                         , "ger" = "#D19590", "jpn" = "#A69FCB" )) +
+  ggtitle("Language Books Written In") +
+  labs(x = "Languages", y = "Number of Books", caption = "Source: books.csv") +
+  theme(panel.border = element_blank()
+        , panel.grid.major = element_blank()
+        , panel.grid.minor = element_blank()
+        , panel.background = element_rect(fill = "#FFFDF1")
+        , plot.background = element_rect(fill = "#FFFDF1")
+        , axis.line = element_line(colour = "grey"))
+
+## Histogram of Number of Pages
+# Filter out books with zero to 50 pages and pages above 2000
+books <- books %>% filter(books$Number_Pages > 50 & books$Number_Pages < 1000)
+books$Number_Pages %>% summary
+
+# Plot 2 Histogram
+par(mar = c(5, 5, 4, 1), cex.lab = 1.0)
+ggplot(books, aes(x = Number_Pages)) +
+  geom_histogram(binwidth = 20, color = "black", fill = "#BF98BC") + 
+  ggtitle("Number of Pages Distribution") +
+  labs(x = "Number of Pages", y = "Number of Books", caption = "Source: books.csv") +
+  theme(panel.border = element_blank()
+        , panel.grid.major = element_blank()
+        , panel.grid.minor = element_blank()
+        , panel.background = element_rect(fill = "#FFFDF1")
+        , plot.background = element_rect(fill = "#FFFDF1")
+        , axis.line = element_line(colour = "grey")) +
+  geom_vline(aes(xintercept = mean(Number_Pages)),
+             color = "#63B0B8", linetype="dashed", size=1)
+
+## Create publisher Word cloud
+# Install packages
+install.packages("tm")
+install.packages("SnowballC")
+install.packages("wordcloud")
+install.packages("RColorBrewer")
+
+# Load packages
+library(tm)
+library(SnowballC)
+library(wordcloud)
+library(RColorBrewer)
+
+text <- readLines(file.choose())
+
+docs <- Corpus(VectorSource(text))
+inspect(docs)
+
+toSpace <- content_transformer(function(x, pattern ) gsub(pattern, " ", x))
+docs <- tm_map(docs, toSpace, "/")
+
+docs <- tm_map(docs, content_transformer(tolower))
+docs <- tm_map(docs, stripWhitespace)
+
+dtm <- TermDocumentMatrix(docs)
+m <- as.matrix(dtm)
+v <- sort(rowSums(m), decreasing = TRUE)
+d <- data.frame(word = names(v), freq=v)
+head(d, 10)
+
+set.seed(500)
+wordcloud(words = d$word, freq = d$freq, min.freq = 1
+          , max.words = 200, random.order = FALSE, rot.per = 0.35, size = 1
+          , colors = c("#63B0B8", "#BF98BC", "#7DA9CF", "#D19590","#A69FCB")
+          , backgroundColor = "FFFDF1")
+
+# Plot top authors by number of books - data exploration (AuthorPlot)
+par(mar = c(5, 5, 4, 1), cex.lab = 1.0)
+ggplot(booksAuthors, aes(x = reorder(Authors, -count), y = count)) +
+  geom_bar(stat= 'identity') + ggtitle("Authors with the Most Books") +
+  labs(x = "Authors", y = "Number of Books", caption = "Source: books.csv") +
+  theme(axis.text.x = element_text(angle = 90)) +
+  theme(panel.border = element_blank()
+        , panel.grid.major = element_blank()
+        , panel.grid.minor = element_blank()
+        , panel.background = element_rect(fill = "#FFFDF1")
+        , plot.background = element_rect(fill = "#FFFDF1")
+        , axis.line = element_line(colour = "grey"))
+
+# Pages by Author
+pageAuthor <- books %>% group_by(Authors)
+PageAuthor_Page<- dplyr::summarize(pageAuthor, count = n(), pages = mean(Number_Pages, na.rm = T)) %>%
+  filter(count > 20) %>% arrange(desc(pages))
+ggplot(PageAuthor_Page, aes(x=pages, y=count, color = Authors)) + 
+  geom_point(size = 4, shape = 15) +
+  geom_point(size = 4, shape = 15) +
+  scale_color_manual(values = c("#63B0B8", "#BF98BC", "#7DA9CF", "#D19590", "#A69FCB", "#B86B63"
+                                , "#9BE8F0", "#CE94A6", "#9EA97D", "#C89B7F", "#DC9714", "#4EA2A2"
+                                , "#D4B95E", "#D28F33", "#B34233", "#751A33")) +
+  ggtitle("Authors with Most Books, Number of Pages") +
+  labs(x = "Average Number of Pages by Author", y = "Number of Books", caption = "Source: books.csv") +
+  theme(panel.border = element_blank()
+        , panel.grid.major = element_blank()
+        , panel.grid.minor = element_blank()
+        , panel.background = element_rect(fill = "#FFFDF1")
+        , plot.background = element_rect(fill = "#FFFDF1")
+        , axis.line = element_line(colour = "grey"))
+
+# Plot Average Rating - Data exploration (AverageRatingPlot)
+par(bg = "#FFFDF1")
+boxplot(books$Average_Rating, horizontal = T, xlab = "Average Rating", col = "#63B0B8"
+        , outpch = 21, outbg = "#D28F33"
+        , main = "Boxplot Distribution of Average Book Rating")
+mtext(text = "Source: books.csv", side = 1, line = 3.5, at = 4.5, cex = .8)
+
+# Ratings by authors
+rateAuthor <- books %>% group_by(Authors)
+RateAuthor_Rating<- dplyr::summarize(rateAuthor, count = n(), rating = mean(Average_Rating, na.rm = T)) %>%
+  filter(count > 20) %>% arrange(desc(rating))
+
+ggplot(RateAuthor_Rating, aes(x=rating, y=count, color = Authors)) + 
+  geom_point(size = 4, shape = 15) +
+  scale_color_manual(values = c("#63B0B8", "#BF98BC", "#7DA9CF", "#D19590", "#A69FCB", "#B86B63"
+                                , "#9BE8F0", "#CE94A6", "#9EA97D", "#C89B7F", "#DC9714", "#4EA2A2"
+                                , "#D4B95E", "#D28F33", "#B34233", "#751A33")) +
+  ggtitle("Authors with Most Books, Average Rating") +
+  labs(x = "Average Rating of Authors", y = "Number of Books", caption = "Source: books.csv") +
+  theme(panel.border = element_blank()
+        , panel.grid.major = element_blank()
+        , panel.grid.minor = element_blank()
+        , panel.background = element_rect(fill = "#FFFDF1")
+        , plot.background = element_rect(fill = "#FFFDF1")
+        , axis.line = element_line(colour = "grey"))
+
+# Average Ratings vs Ratings Count
+par(mar = c(5, 5, 4, 1), cex.lab = 1.0, bg = "#FFFDF1")
+options(scipen = 5)
+plot(books$Average_Rating, books$Ratings_Count, ylim = c(0, 2500000), ylab = "Ratings Count"
+     , xlab = "Average Rating", pch = 10, cex = 1, col = "#D19590"
+     , main = "Average Rating Compared to Ratings Count")
+mtext(text = "Source: books.csv", side = 1, line = 3.5, at = 4.5, cex = .8)
+
+# Scatter Plot # Didn't use
+par(mar = c(5, 5, 4, 1), cex.lab = 1.0)
+plot(books$Text_Reviews_Count, col = "blue"
+     , xlab = "Text Review Count"
+     , ylab = "Frequency", main = "Scatter Plot of Text Review Counts")
+mtext(text = "Source: books.csv", side = 1, line = 3.5, at = 10000, cex = .8)
